@@ -60,9 +60,7 @@
             dispatch_group_leave(group);
         }];
     }
-    // RTC 离开频道
-//    [NERtcEngine.sharedEngine leaveChannel];
-    
+        
     dispatch_group_notify(group, NSOperationQueue.currentQueue.underlyingQueue ?: dispatch_get_main_queue(), ^{
         [NERtcCallKit.sharedInstance closeSignalChannel:^{
             if (completion) {
@@ -77,7 +75,6 @@
     NIMSignalingLeaveChannelRequest *request = [[NIMSignalingLeaveChannelRequest alloc] init];
     request.channelId = self.context.channelInfo.channelId;
     [NIMSDK.sharedSDK.signalManager signalingLeaveChannel:request completion:^(NSError * _Nullable error) {
-        [self.context cleanUp];
         NERtcCallKit.sharedInstance.callStatus = NERtcCallStatusIdle;
         if (completion) {
             completion(nil);
@@ -169,7 +166,13 @@
 }
 
 - (void)onTimeout {
-    [NERtcCallKit.sharedInstance cancelInvites:nil];
+    if (self.context.isGroupCall) {
+        [NERtcCallKit.sharedInstance cancelInvites:nil];
+    } else {
+        [self hangup:^(NSError * _Nullable error) {
+            [NERtcCallKit.sharedInstance.delegateProxy onCallEnd];
+        }];
+    }
 }
 
 @end
