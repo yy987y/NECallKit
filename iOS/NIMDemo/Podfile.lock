@@ -27,6 +27,7 @@ PODS:
   - SVProgressHUD (2.1.2)
   - Toast (3.1.0)
   - TZImagePickerController (3.5.9)
+  - YXAlog_iOS (1.0.0)
   - YYImage (1.0.4):
     - YYImage/Core (= 1.0.4)
   - YYImage/Core (1.0.4)
@@ -49,6 +50,7 @@ DEPENDENCIES:
   - SVProgressHUD (~> 2.1.2)
   - Toast (~> 3.0)
   - TZImagePickerController (~> 3.5.2)
+  - YXAlog_iOS (= 1.0.0)
   - YYImage
   - YYImage/WebP
 
@@ -70,6 +72,7 @@ SPEC REPOS:
     - SVProgressHUD
     - Toast
     - TZImagePickerController
+    - YXAlog_iOS
     - YYImage
 
 SPEC CHECKSUMS:
@@ -89,8 +92,9 @@ SPEC CHECKSUMS:
   SVProgressHUD: c404a55d78acbeb7ebb78b76d3faf986475a6994
   Toast: 14a93686d6c8bfe2727afd342414e35660a8a1f3
   TZImagePickerController: 07a2f834f4908689759a7e54f74e9a018e047cb6
+  YXAlog_iOS: ff2a7e6897b6355885991799f514f687592de0e8
   YYImage: 1e1b62a9997399593e4b9c4ecfbbabbf1d3f3b54
 
-PODFILE CHECKSUM: 7f238b1bdea74b83456b4a9f5cbd988cb6f1a08d
+PODFILE CHECKSUM: 2b190548bf4c211f31b4b195f7c7066ab079f6fe
 
 COCOAPODS: 1.10.1

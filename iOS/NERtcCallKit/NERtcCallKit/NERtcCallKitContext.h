@@ -49,6 +49,8 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)addMember:(NIMSignalingMemberInfo *)member;
 - (void)removeMember:(NIMSignalingMemberInfo *)member;
 
+- (void)fetchMemberWithUid:(uint64_t)uid completion:(void(^)(NIMSignalingMemberInfo *member))completion;
+
 @end
 
 NS_ASSUME_NONNULL_END

@@ -2,6 +2,7 @@ platform :ios, '9.0'
 workspace 'NIM.xcworkspace'
 
 abstract_target 'NIMDemo' do
+  
     pod 'SDWebImage', '~> 5.0.6'
     pod 'SDWebImageFLPlugin', '~> 0.3.0'
     pod 'Toast', '~> 3.0'
@@ -11,6 +12,7 @@ abstract_target 'NIMDemo' do
     pod 'YYImage/WebP'
     pod 'NERtcSDK', '4.0.3'
     pod 'NIMSDK_LITE', '8.3.1'
+    pod 'YXAlog_iOS', '1.0.0'
 
     target 'NIM' do
         project 'NIM.xcodeproj'
