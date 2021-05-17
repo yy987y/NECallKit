@@ -87,7 +87,7 @@ public class CallService {
 
 
         @Override
-        public void onUserReject(String userId) {
+        public void onRejectByUserId(String userId) {
 
         }
 
@@ -98,7 +98,7 @@ public class CallService {
         }
 
         @Override
-        public void onUserCancel(String userId) {
+        public void onCancelByUserId(String userId) {
             cancelNotification();
         }
 
@@ -119,21 +119,6 @@ public class CallService {
         }
 
         @Override
-        public void onUserAccept(String userId) {
-
-        }
-
-        @Override
-        public void onOtherClientAccept() {
-
-        }
-
-        @Override
-        public void onOtherClientReject() {
-
-        }
-
-        @Override
         public void onUserNetworkQuality(Entry<String, Integer>[] stats) {
 
         }
@@ -144,7 +129,12 @@ public class CallService {
         }
 
         @Override
-        public void onCallingTimeOut() {
+        public void timeOut() {
+
+        }
+
+        @Override
+        public void onFirstVideoFrameDecoded(String userId, int width, int height) {
 
         }
 

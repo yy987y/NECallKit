@@ -33,6 +33,7 @@ dependencies {
     implementation 'androidx.appcompat:appcompat:1.1.0'
     implementation 'androidx.recyclerview:recyclerview:1.1.0'
     implementation 'com.blankj:utilcodex:1.29.0'
+    implementation 'com.netease.yunxin.kit:alog:1.0.0'
 
     nimVersion = '8.3.1'
 
@@ -41,8 +42,4 @@ dependencies {
     implementation "com.netease.nimlib:push:$nimVersion"
     api 'com.netease.yunxin:nertc:4.0.3'
 
-    compileOnly 'com.huawei.hms:push:4.0.4.301'
-    compileOnly 'com.meizu.flyme.internet:push-internal:3.9.7'
-    compileOnly 'com.google.android.gms:play-services-base:17.1.0'
-    compileOnly 'com.google.firebase:firebase-messaging:20.1.0'
 }

@@ -54,7 +54,7 @@ public interface NERTCCallingDelegate {
      *
      * @param userId 拒绝通话的用户
      */
-    void onUserReject(String userId);
+    void onRejectByUserId(String userId);
 
 
     /**
@@ -67,7 +67,7 @@ public interface NERTCCallingDelegate {
     /**
      * 作为被邀请方会收到，收到该回调说明本次通话被取消了
      */
-    void onUserCancel(String userId);
+    void onCancelByUserId(String userId);
 
 
     /**
@@ -94,22 +94,6 @@ public interface NERTCCallingDelegate {
     void onDisconnect(int res);
 
     /**
-     * 用户已经接受
-     * @param userId 用户id
-     */
-    void onUserAccept(String userId);
-
-    /**
-     * 其他端接受
-     */
-    void onOtherClientAccept();
-
-    /**
-     * 其他端拒绝
-     */
-    void onOtherClientReject();
-
-    /**
      * 网络状态回调
      *
      * @param stats
@@ -126,5 +110,15 @@ public interface NERTCCallingDelegate {
     /**
      * 呼叫超时
      */
-    void onCallingTimeOut();
+    void timeOut();
+
+    /**
+     * 已解码远端首帧回调
+     *
+     * @param userId 远端用户id
+     * @param width 首帧视频宽，单位为 px。
+     * @param height 首帧视频高，单位为 px。
+     */
+    void onFirstVideoFrameDecoded(String userId, int width, int height);
+
 }
