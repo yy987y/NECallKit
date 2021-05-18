@@ -1,9 +1,10 @@
 package com.netease.yunxin.nertc.nertcvideocall.model.impl;
 
 import android.content.Context;
-import android.media.AudioManager;
 import android.os.CountDownTimer;
 import android.text.TextUtils;
+import android.util.LongSparseArray;
+import android.util.Pair;
 
 import com.blankj.utilcode.util.GsonUtils;
 import com.blankj.utilcode.util.NetworkUtils;
@@ -56,6 +57,10 @@ import com.netease.nimlib.sdk.msg.model.IMMessage;
 import com.netease.nimlib.sdk.uinfo.UserService;
 import com.netease.nimlib.sdk.uinfo.model.NimUserInfo;
 import com.netease.nimlib.sdk.util.Entry;
+import com.netease.yunxin.kit.alog.ALog;
+import com.netease.yunxin.kit.alog.BasicInfo;
+import com.netease.yunxin.kit.alog.ParameterMap;
+import com.netease.yunxin.nertc.nertcvideocall.BuildConfig;
 import com.netease.yunxin.nertc.nertcvideocall.bean.ControlInfo;
 import com.netease.yunxin.nertc.nertcvideocall.bean.CustomInfo;
 import com.netease.yunxin.nertc.nertcvideocall.model.CallErrorCode;
@@ -72,17 +77,17 @@ import com.netease.yunxin.nertc.nertcvideocall.model.impl.state.DialogState;
 import com.netease.yunxin.nertc.nertcvideocall.model.impl.state.IdleState;
 import com.netease.yunxin.nertc.nertcvideocall.model.impl.state.InvitedState;
 import com.netease.yunxin.nertc.nertcvideocall.service.CallService;
-import com.netease.yunxin.nertc.nertcvideocall.utils.ALog;
 import com.netease.yunxin.nertc.nertcvideocall.utils.CallParams;
 import com.netease.yunxin.nertc.nertcvideocall.utils.NrtcCallStatus;
-import com.netease.yunxin.nertc.nertcvideocall.utils.ParameterMap;
 import com.netease.yunxin.nertc.nertcvideocall.utils.VersionUtils;
 
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
@@ -94,7 +99,7 @@ import static com.netease.lava.nertc.sdk.NERtcParameters.KEY_AUTO_SUBSCRIBE_AUDI
 public class NERTCVideoCallImpl extends NERTCVideoCall {
     private static final String VERSION_1_1_0 = "1.1.0";
 
-    private static final String CURRENT_VERSION = "1.1.0";
+    private static final String CURRENT_VERSION = "1.2.0";
 
     private static final String LOG_TAG = "NERTCVideoCallImpl";
 
@@ -160,7 +165,7 @@ public class NERTCVideoCallImpl extends NERTCVideoCall {
     //************************呼叫超时start********************
     private static final int TIME_OUT_LIMITED = 2 * 60 * 1000;//呼叫超时限制
 
-    private int timeOut = TIME_OUT_LIMITED;//呼叫超时，最长2分钟
+    private long timeOut = TIME_OUT_LIMITED;//呼叫超时，最长2分钟
 
     private CountDownTimer timer;//呼出倒计时
     //************************呼叫超时end********************
@@ -191,12 +196,7 @@ public class NERTCVideoCallImpl extends NERTCVideoCall {
      */
     private boolean canJoinRtc = false;
 
-    /**
-     * 解决bug YYTX-1481
-     */
-    private AudioManager audioManager;
-
-    private boolean isSpeakerPhoneOn;
+    private final LongSparseArray<List<Pair<Integer,Map<String,Object>>>> rtcActionArray = new LongSparseArray<>();
 
 
     public static synchronized NERTCVideoCall sharedInstance() {
@@ -211,6 +211,7 @@ public class NERTCVideoCallImpl extends NERTCVideoCall {
             instance.destroy();
             instance = null;
         }
+        ALog.flush(true);
     }
 
     @Override
@@ -251,6 +252,7 @@ public class NERTCVideoCallImpl extends NERTCVideoCall {
      * 多端同步(接受/拒绝)
      */
     Observer<InviteAckEvent> otherClientEvent = (Observer<InviteAckEvent>) ackEvent -> {
+        ALog.d(LOG_TAG, "otherClientEvent :" + ackEvent.getEventType().name());
         switch (ackEvent.getEventType()) {
             case ACCEPT:
                 resetState();
@@ -314,7 +316,15 @@ public class NERTCVideoCallImpl extends NERTCVideoCall {
                 break;
             case JOIN:
                 UserJoinEvent userJoinEvent = (UserJoinEvent) event;
-                updateMemberMap(userJoinEvent.getMemberInfo());
+                MemberInfo memberInfo = userJoinEvent.getMemberInfo();
+                updateMemberMap(memberInfo);
+                long uid = memberInfo.getUid();
+                List<Pair<Integer, Map<String, Object>>> actionList = rtcActionArray.get(uid);
+                if (actionList != null && !actionList.isEmpty()) {
+                    for (Pair<Integer, Map<String, Object>> pair : actionList) {
+                        dispatchRtcAction(uid, pair.first, pair.second);
+                    }
+                }
                 break;
             case INVITE:
                 invitedEvent = (InvitedEvent) event;
@@ -349,7 +359,7 @@ public class NERTCVideoCallImpl extends NERTCVideoCall {
                 ALog.d(LOG_TAG, "accept cancel signaling request Id = " + canceledInviteEvent.getRequestId());
                 leave(null);
                 if (delegateManager != null) {
-                    delegateManager.onUserCancel(canceledInviteEvent.getFromAccountId());
+                    delegateManager.onCancelByUserId(canceledInviteEvent.getFromAccountId());
                 }
                 break;
             case REJECT:
@@ -359,15 +369,14 @@ public class NERTCVideoCallImpl extends NERTCVideoCall {
                 if (!TextUtils.equals(ackEvent.getChannelBaseInfo().getChannelId(), imChannelId)) {
                     break;
                 }
-                if (ackEvent.getAckStatus() == InviteAckStatus.ACCEPT) {
-                    ALog.d(LOG_TAG, "user accept set status dialog");
-                    CustomInfo customInfo = GsonUtils.fromJson(ackEvent.getCustomInfo(), CustomInfo.class);
+                if (ackEvent.getAckStatus() == InviteAckStatus.ACCEPT && callType == CallParams.CallType.P2P) {
+                    CustomInfo customInfo = GsonUtils.fromJson(ackEvent.getCustomInfo(),CustomInfo.class);
                     if (customInfo != null) {
                         otherVersion.updateParam(customInfo.version);
                     }
                     String channelId = VersionUtils.compareVersion(otherVersion.param, VERSION_1_1_0) >= 0
                             ? rtcChannelName.param : ackEvent.getChannelBaseInfo().getChannelId();
-                    handleWhenUserAccept(channelId,ackEvent.getFromAccountId());
+                    handleWhenUserAccept(channelId);
                 } else if (ackEvent.getAckStatus() == InviteAckStatus.REJECT) {
                     if (callType == CallParams.CallType.P2P) {
                         leave(null);
@@ -383,7 +392,7 @@ public class NERTCVideoCallImpl extends NERTCVideoCall {
                         if (callOrderListener != null && callType == CallParams.CallType.P2P) {
                             callOrderListener.onReject(ackEvent.getChannelBaseInfo().getType(), ackEvent.getFromAccountId(), callType);
                         }
-                        delegateManager.onUserReject(ackEvent.getFromAccountId());
+                        delegateManager.onRejectByUserId(ackEvent.getFromAccountId());
                     }
                 }
 
@@ -396,7 +405,7 @@ public class NERTCVideoCallImpl extends NERTCVideoCall {
                 ControlInfo controlInfo = GsonUtils.fromJson(controlEvent.getCustomInfo(), ControlInfo.class);
                 if (controlInfo != null) {
                     // 老版本
-                    if (controlInfo.cid == 1 && invitedChannelInfo != null && currentState.getStatus() == CallState.STATE_DIALOG) {
+                    if (controlInfo.cid == 1 && invitedChannelInfo != null && currentState.getStatus() == CallState.STATE_INVITED) {
                         canJoinRtc = true;
                         if (rtcToken.isInit()){
                             return;
@@ -454,11 +463,10 @@ public class NERTCVideoCallImpl extends NERTCVideoCall {
      *
      * @param channelId
      */
-    private void handleWhenUserAccept(String channelId,String userId) {
+    private void handleWhenUserAccept(String channelId) {
         ALog.d(LOG_TAG, "handleWhenUserAccept handleUserAccept = " + handleUserAccept + " status = " + currentState.getStatus());
         ALog.dApi(LOG_TAG, new ParameterMap("handleWhenUserAccept")
                 .append("channelId",channelId)
-                .toValue()
         );
         if (!handleUserAccept && currentState.getStatus() == CallState.STATE_CALL_OUT) {
             canJoinRtc = true;
@@ -470,14 +478,8 @@ public class NERTCVideoCallImpl extends NERTCVideoCall {
                 delegateManager.onError(rtcResult, "join rtc channel failed", true);
                 resetState();
             }
-            if(timer != null){
-                timer.cancel();
-            }
-
-            delegateManager.onUserAccept(userId);
 
             handleUserAccept = true;
-            currentState.dialog();
         }
     }
 
@@ -491,7 +493,6 @@ public class NERTCVideoCallImpl extends NERTCVideoCall {
                 .append("channelId", channelId)
                 .append("accountId", accountId)
                 .append("controlInfo", controlInfo)
-                .toValue()
         );
         NIMClient.getService(SignallingService.class).sendControl(channelId, accountId, GsonUtils.toJson(controlInfo)).setCallback(callback);
     }
@@ -499,7 +500,7 @@ public class NERTCVideoCallImpl extends NERTCVideoCall {
     /**
      * Nertc的回调
      */
-    private NERtcCallback rtcCallback = new NERtcCallbackExTemp() {
+    private final NERtcCallback rtcCallback = new NERtcCallbackExTemp() {
         @Override
         public void onJoinChannel(int result, long l, long l1) {
             ALog.d(LOG_TAG, "onJoinChannel result = " + result + " l = " + l + " l1 =" + l1);
@@ -511,7 +512,7 @@ public class NERTCVideoCallImpl extends NERTCVideoCall {
                 return;
             }
             haveJoinNertcChannel = true;
-            if (callType == CallParams.CallType.P2P &&
+            if (callType == CallParams.CallType.P2P && currentState.getStatus() == CallState.STATE_CALL_OUT &&
                     !TextUtils.isEmpty(callUserId) && !TextUtils.isEmpty(imChannelId)
                     && VersionUtils.compareVersion(otherVersion.param, VERSION_1_1_0) < 0) {
                 sendControlEvent(imChannelId, callUserId, new ControlInfo(1), null);
@@ -532,71 +533,47 @@ public class NERTCVideoCallImpl extends NERTCVideoCall {
 
         @Override
         public void onUserJoined(long l) {
-            if (!isCurrentUser(l)) {
-                if(invitedParams != null){
-                    invitedParams.clear();
-                }
+            if (timer != null) {
+                timer.cancel();
             }
-            if (delegateManager != null) {
-                ALog.dApi(LOG_TAG, new ParameterMap("onUserJoined")
-                        .append("uid", l)
-                        .toValue()
-                );
-                delegateManager.onUserEnter(memberInfoMap.get(l));
-            }
+            handleRtcAction(l, UserRtcAction.JOIN, () -> handleUserJoinAction(l));
         }
 
         @Override
         public void onUserLeave(long uid, int reason) {
-            ALog.d(LOG_TAG, String.format("onUserLeave uid = %d,reason = %d",uid,reason));
-            if (currentState.getStatus() == CallState.STATE_DIALOG) {
-                if(reason == 0){//正常离开
-                    delegateManager.onUserLeave(memberInfoMap.get(uid));
-                } else {//非正常离开
-                    delegateManager.onUserDisconnect(memberInfoMap.get(uid));
-                }
-                if (callType == CallParams.CallType.P2P) {
-                    leave(null);
-                }
-            }
+            Map<String, Object> map = new HashMap<>();
+            map.put(RtcActionParamKeys.KEY_REASON, reason);
+            handleRtcAction(uid, UserRtcAction.LEAVE,map, () -> handleUserLeave(uid, reason));
         }
 
         @Override
         public void onUserAudioStart(long l) {
-            ALog.d(LOG_TAG, "onUserAudioStart");
-            if (!isCurrentUser(l)) {
-                NERtcEx.getInstance().subscribeRemoteAudioStream(l, true);
-            }
-            if (delegateManager != null) {
-                delegateManager.onAudioAvailable(memberInfoMap.get(l), true);
-            }
+            handleRtcAction(l, UserRtcAction.AUDIO_START, () -> handleUserAudioAction(l, true));
         }
 
         @Override
         public void onUserAudioStop(long l) {
-            ALog.d(LOG_TAG, "onUserAudioStop");
-            if (delegateManager != null) {
-                delegateManager.onAudioAvailable(memberInfoMap.get(l), false);
-            }
+            handleRtcAction(l, UserRtcAction.AUDIO_STOP, () -> handleUserAudioAction(l, false));
         }
 
         @Override
         public void onUserVideoStart(long l, int i) {
-            ALog.d(LOG_TAG, "onUserVideoStart");
-            if (!isCurrentUser(l)) {
-                NERtcEx.getInstance().subscribeRemoteVideoStream(l, NERtcRemoteVideoStreamType.kNERtcRemoteVideoStreamTypeHigh, true);
-            }
-            if (delegateManager != null) {
-                delegateManager.onCameraAvailable(memberInfoMap.get(l), true);
-            }
+            Map<String, Object> map = new HashMap<>();
+            map.put(RtcActionParamKeys.KEY_REASON, i);
+            handleRtcAction(l, UserRtcAction.VIDEO_START, map,() -> handleUserVideoAction(l, i, true));
         }
 
         @Override
         public void onUserVideoStop(long l) {
-            ALog.d(LOG_TAG, "onUserVideoStop");
-            if (delegateManager != null) {
-                delegateManager.onCameraAvailable(memberInfoMap.get(l), false);
-            }
+            handleRtcAction(l, UserRtcAction.VIDEO_STOP, () -> handleUserVideoAction(l, -1, false));
+        }
+
+        @Override
+        public void onFirstVideoFrameDecoded(long userId, int width, int height) {
+            Map<String, Object> map = new HashMap<>();
+            map.put(RtcActionParamKeys.KEY_WIDTH, width);
+            map.put(RtcActionParamKeys.KEY_HEIGHT, height);
+            handleRtcAction(userId, UserRtcAction.FIRST_VIDEO_FRAME_DECODED, map, () -> handleUserFirstVideoFrameDecoded(userId, width, height));
         }
 
         @Override
@@ -666,8 +643,19 @@ public class NERTCVideoCallImpl extends NERTCVideoCall {
     @Override
     public void setupAppKey(Context context, String appKey, VideoCallOptions option) {
         mContext = context;
-        audioManager = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
-        audioManager.setSpeakerphoneOn(true);
+        ALog.init(context, ALog.LEVEL_DEBUG);
+        ALog.logFirst(new BasicInfo.Builder()
+                .packageName(context)
+                .nertcVersion("4.0.3")
+                .imVersion("8.3.1")
+                .deviceId(context)
+                .version(CURRENT_VERSION)
+                .platform("Android")
+                .name("CallKit",true)
+                .gitHashCode(BuildConfig.GIT_COMMIT_HASH)
+                .extra(Collections.singletonMap("From",BuildConfig.FROM))
+                .build());
+
         //初始化之前 destroy
         if (neRtc != null) {
             destroy();
@@ -811,6 +799,11 @@ public class NERTCVideoCallImpl extends NERTCVideoCall {
     }
 
     @Override
+    public int getCurrentState() {
+        return currentState.getStatus();
+    }
+
+    @Override
     public void addDelegate(NERTCCallingDelegate delegate) {
         delegateManager.addDelegate(delegate);
     }
@@ -875,11 +868,10 @@ public class NERTCVideoCallImpl extends NERTCVideoCall {
             delegateManager.onError(CallErrorCode.STATUS_ERROR, "switchCallType status error, status = " + currentState.getStatus(), false);
         }
         if (type == ChannelType.AUDIO) {
-            neRtc.enableLocalVideo(false);
             sendControlEvent(imChannelId, callUserId, new ControlInfo(2, type.getValue()), new RequestCallback<Void>() {
                 @Override
                 public void onSuccess(Void param) {
-                    NERtcEx.getInstance().enableLocalAudio(false);
+                    NERtcEx.getInstance().enableLocalVideo(false);
                     callback.onSuccess(param);
                 }
 
@@ -897,7 +889,8 @@ public class NERTCVideoCallImpl extends NERTCVideoCall {
     }
 
     @Override
-    public void setTimeOut(int timeOut) {
+    public void setTimeOut(long timeOut) {
+        ALog.d(LOG_TAG,"setTimeOut timeOut = " + timeOut);
         if (timeOut < TIME_OUT_LIMITED) {
             this.timeOut = timeOut;
         }
@@ -940,7 +933,7 @@ public class NERTCVideoCallImpl extends NERTCVideoCall {
                     hangup(null);
                 }
                 if (delegateManager != null) {
-                    delegateManager.onCallingTimeOut();
+                    delegateManager.timeOut();
                 }
             }
         };
@@ -999,6 +992,21 @@ public class NERTCVideoCallImpl extends NERTCVideoCall {
         createIMChannelAndJoin(CallParams.CallType.TEAM, groupId, type, selfUserId, userIds, null, joinChannelCallBack);
     }
 
+    @Override
+    public void groupInvite(ArrayList<String> callUserIds, ArrayList<String> totalUserIds,String groupId, String selfUserId, JoinChannelCallBack joinChannelCallBack) {
+        if (callType == CallParams.CallType.P2P) {
+            joinChannelCallBack.onJoinFail("p2p can not call this api", CallErrorCode.COMMON_ERROR);
+            return;
+        }
+        if (currentState.getStatus() != CallState.STATE_DIALOG&&currentState.getStatus()!=CallState.STATE_CALL_OUT) {
+            joinChannelCallBack.onJoinFail("current state is error statue is:" + currentState.getStatus(), CallErrorCode.STATUS_ERROR);
+            return;
+        }
+        for (String userId : callUserIds) {
+            inviteOneUserWithIM(callType, callOutType, userId, selfUserId, imChannelId, groupId, totalUserIds);
+            joinChannelCallBack.onJoinChannel(null);
+        }
+    }
 
     /**
      * 创建IM渠道并加入
@@ -1265,9 +1273,7 @@ public class NERTCVideoCallImpl extends NERTCVideoCall {
         ALog.dApi(LOG_TAG, new ParameterMap( "joinChannel")
                 .append("token", token)
                 .append("channelName", channelName)
-                .toValue()
         );
-        isSpeakerPhoneOn = audioManager.isSpeakerphoneOn();
         if (selfRtcUid != 0) {
             //加入rtc房间之前设置一个默认的videoConfig，清除上次通话的设置
             NERtcVideoConfig videoConfig = new NERtcVideoConfig();
@@ -1307,11 +1313,7 @@ public class NERTCVideoCallImpl extends NERTCVideoCall {
         ALog.dApi(LOG_TAG, new ParameterMap("accept")
                 .append("inviteParam", GsonUtils.toJson(inviteParam))
                 .append("selfAccId", selfAccId)
-                .toValue()
         );
-        if (timer != null) {
-            timer.cancel();
-        }
         if (currentState.getStatus() != CallState.STATE_INVITED) {
             delegateManager.onError(CallErrorCode.STATUS_ERROR, "accept status error, status = " + currentState.getStatus(), false);
         }
@@ -1324,7 +1326,6 @@ public class NERTCVideoCallImpl extends NERTCVideoCall {
                     public void onResult(int code, ChannelFullInfo channelFullInfo, Throwable throwable) {
                         if (code == ResponseCode.RES_SUCCESS) {
                             ALog.d(LOG_TAG, "accept success");
-                            currentState.dialog();
                             if (channelFullInfo.getType() == ChannelType.AUDIO) {
                                 neRtc.enableLocalVideo(false);
                             }
@@ -1502,7 +1503,6 @@ public class NERTCVideoCallImpl extends NERTCVideoCall {
         int rtcResult = -1;
         if (neRtc != null) {
             rtcResult = neRtc.leaveChannel();
-            audioManager.setSpeakerphoneOn(isSpeakerPhoneOn);
         }
 
         if (rtcResult != 0 && callback != null) {
@@ -1513,8 +1513,8 @@ public class NERTCVideoCallImpl extends NERTCVideoCall {
     @Override
     public void leave(RequestCallback<Void> callback) {
         //群呼如果未接通走取消逻辑
-        if (currentState.getStatus() == CallState.STATE_IDLE) {
-            delegateManager.onError(CallErrorCode.STATUS_ERROR, "leave status error,status is idle" , false);
+        if (currentState.getStatus() != CallState.STATE_DIALOG) {
+            delegateManager.onError(CallErrorCode.STATUS_ERROR, "leave status error,status = " + currentState.getStatus(), false);
         }
         if (callType == CallParams.CallType.TEAM && currentState.getStatus() == CallState.STATE_CALL_OUT) {
             cancel(new RequestCallback<Void>() {
@@ -1561,6 +1561,9 @@ public class NERTCVideoCallImpl extends NERTCVideoCall {
         currentState.release();
         canJoinRtc = false;
         invitedEvent = null;
+        rtcActionArray.clear();
+        // 直接使用nertcvideoview的销毁可能失效需让sdk 来做销毁操作
+        neRtc.setupLocalVideoCanvas(null);
     }
 
     /**
@@ -1633,7 +1636,7 @@ public class NERTCVideoCallImpl extends NERTCVideoCall {
 
                         if (callType == CallParams.CallType.P2P) {
                             if (i == ResponseCode.RES_INVITE_HAS_ACCEPT) {//用户已经接受
-                                handleWhenUserAccept(imChannelId,callUserId);
+                                handleWhenUserAccept(imChannelId);
                             } else {
                                 leave(null);
                             }
@@ -1664,7 +1667,15 @@ public class NERTCVideoCallImpl extends NERTCVideoCall {
             }
 
             if (callType == CallParams.CallType.P2P) {
-                hangup(null);
+                //离开信令的channel
+                if (!TextUtils.isEmpty(imChannelId)) {
+                    closeIMChannel(imChannelId, callback);
+                } else if (callback != null) {
+                    callback.onFailed(-1);
+                }
+
+                leaveRtcChannel(callback);
+                resetState();
             }
         }
     }
@@ -1764,7 +1775,6 @@ public class NERTCVideoCallImpl extends NERTCVideoCall {
     private void loadToken(final long uid, RequestCallback<String> callback) {
         ALog.dApi(LOG_TAG, new ParameterMap("loadToken")
                 .append("uid", uid)
-                .toValue()
         );
         if (TextUtils.isEmpty(appKey)) {
             callback.onFailed(-1);
@@ -1780,7 +1790,6 @@ public class NERTCVideoCallImpl extends NERTCVideoCall {
             public void onSuccess(String param) {
                 ALog.dApi(LOG_TAG, new ParameterMap("loadToken-getToken-onSuccess")
                         .append("param", param)
-                        .toValue()
                 );
                 callback.onSuccess(param);
                 ALog.i(LOG_TAG, "load token success. token is " + param);
@@ -1808,6 +1817,132 @@ public class NERTCVideoCallImpl extends NERTCVideoCall {
         } else {
             leave(null);
         }
+    }
+
+    private void handleUserJoinAction(long uid) {
+        if (!isCurrentUser(uid)) {
+            ALog.d(LOG_TAG, "onUserJoined set status dialog");
+            currentState.dialog();
+            if (invitedParams != null) {
+                invitedParams.clear();
+            }
+        }
+        if (delegateManager != null && memberInfoMap.get(uid) != null) {
+            ALog.dApi(LOG_TAG, new ParameterMap("onUserJoined")
+                    .append("uid", uid)
+            );
+            delegateManager.onUserEnter(memberInfoMap.get(uid));
+        }
+    }
+    //
+    private void handleUserVideoAction(long uid, int reason, boolean start) {
+        if (start) {
+            ALog.d(LOG_TAG, "onUserVideoStart");
+            if (!isCurrentUser(uid)) {
+                NERtcEx.getInstance().subscribeRemoteVideoStream(uid, NERtcRemoteVideoStreamType.kNERtcRemoteVideoStreamTypeHigh, true);
+            }
+            if (delegateManager != null) {
+                delegateManager.onCameraAvailable(memberInfoMap.get(uid), true);
+            }
+        } else {
+            ALog.d(LOG_TAG, "onUserVideoStop");
+            if (delegateManager != null) {
+                delegateManager.onCameraAvailable(memberInfoMap.get(uid), false);
+            }
+        }
+    }
+    // 处理rtc 用户音频回调动作
+    private void handleUserAudioAction(long uid, boolean start) {
+        if (start) {
+            ALog.d(LOG_TAG, "onUserAudioStart");
+            if (!isCurrentUser(uid)) {
+                NERtcEx.getInstance().subscribeRemoteAudioStream(uid, true);
+            }
+            if (delegateManager != null) {
+                delegateManager.onAudioAvailable(memberInfoMap.get(uid), true);
+            }
+        } else {
+            ALog.d(LOG_TAG, "onUserAudioStop");
+            if (delegateManager != null) {
+                delegateManager.onAudioAvailable(memberInfoMap.get(uid), false);
+            }
+        }
+    }
+    // 处理rtc 用户首帧回调动作
+    private void handleUserFirstVideoFrameDecoded(long uid, int width, int height) {
+        ALog.d(LOG_TAG, "onFirstVideoFrameDecoded");
+        if (delegateManager != null) {
+            delegateManager.onFirstVideoFrameDecoded(memberInfoMap.get(uid), width, height);
+        }
+    }
+    // 处理rtc 用户离开回调动作
+    private void handleUserLeave(long uid, int reason) {
+        ALog.d(LOG_TAG, String.format(Locale.getDefault(), "onUserLeave uid = %d,reason = %d", uid, reason));
+        if (currentState.getStatus() == CallState.STATE_DIALOG) {
+            if (reason == 0) {//正常离开
+                delegateManager.onUserLeave(memberInfoMap.get(uid));
+            } else {//非正常离开
+                delegateManager.onUserDisconnect(memberInfoMap.get(uid));
+            }
+            if (callType == CallParams.CallType.P2P) {
+                leave(null);
+            }
+        }
+    }
+    // 处理rtc回调动作
+    private void handleRtcAction(long uid, int actionId, Runnable action) {
+        handleRtcAction(uid, actionId, null, action);
+    }
+    // 处理rtc回调动作
+    private void handleRtcAction(long uid, int actionId, Map<String, Object> params, Runnable action) {
+        if (memberInfoMap.get(uid) == null) {
+            appendRtcAction(uid, actionId, params);
+            return;
+        }
+        action.run();
+    }
+    // 分派rtc 动作再次执行
+    private void dispatchRtcAction(long uid, int action, Map<String, Object> params) {
+        switch (action) {
+            case UserRtcAction.JOIN: {
+                handleUserJoinAction(uid);
+                break;
+            }
+            case UserRtcAction.VIDEO_START: {
+                handleUserVideoAction(uid, (int) params.get(RtcActionParamKeys.KEY_REASON), true);
+                break;
+            }
+            case UserRtcAction.VIDEO_STOP: {
+                handleUserVideoAction(uid, -1, false);
+                break;
+            }
+            case UserRtcAction.AUDIO_START: {
+                handleUserAudioAction(uid, true);
+                break;
+            }
+            case UserRtcAction.AUDIO_STOP: {
+                handleUserAudioAction(uid, false);
+                break;
+            }
+            case UserRtcAction.FIRST_VIDEO_FRAME_DECODED: {
+                handleUserFirstVideoFrameDecoded(uid, (int) params.get(RtcActionParamKeys.KEY_WIDTH),
+                        (int) params.get(RtcActionParamKeys.KEY_HEIGHT));
+                break;
+            }
+            case UserRtcAction.LEAVE: {
+                handleUserLeave(uid, (int) params.get(RtcActionParamKeys.KEY_REASON));
+                break;
+            }
+        }
+    }
+    // 添加rtc 动作
+    private void appendRtcAction(long uid, int action, Map<String, Object> params) {
+        List<Pair<Integer, Map<String, Object>>> actionList = rtcActionArray.get(uid);
+        if (actionList == null) {
+            actionList = new ArrayList<>();
+            rtcActionArray.put(uid, actionList);
+        }
+        actionList.add(new Pair<>(action, params));
     }
 
     /**
