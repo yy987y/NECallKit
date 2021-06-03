@@ -1,7 +1,0 @@
-include ':G2:ui'
-include ':G2:nertcvideocall'
-include ':rtskit'
-include ':faceunity'
-include ':uikit'
-include 'jrmfRpWalletlib'
-include ':demo'
