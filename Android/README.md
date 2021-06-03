@@ -10,7 +10,7 @@
 1. 若仅使用呼叫功能，则开通
    1. 【信令】
    2. 【音视频通话2.0】
-   3. 【非安全模式】-组件默认使用非安全模式，开启安全模式请咨询SO
+   3. 【安全模式】-组件默认使用安全模式，开启安全模式请咨询SO
 2. 若还需使用话单功能，则需要开通
    1. 【IM】
    2. 【G2话单功能】-目前仅支持联系销售/SO进行开通
@@ -34,7 +34,7 @@
 
 * Maven集成
 
-> implementation 'com.netease.yunxin.kit:call:1.1.0'
+> implementation 'com.netease.yunxin.kit:call:1.2.0'
 ```groovy
 allprojects {
     repositories {
@@ -43,6 +43,13 @@ allprojects {
        //...
     }
 }
+
+// 若出现 More than one file was found with OS independent path 'lib/arm64-v8a/libc++_shared.so'.
+// 可以在 Android 追加如下配置
+packagingOptions {
+    pickFirst 'lib/arm64-v8a/libc++_shared.so'
+    pickFirst 'lib/armeabi-v7a/libc++_shared.so'
+} 
 ```
 
 * 手动集成
@@ -59,7 +66,6 @@ allprojects {
 - nertcVideoCall 文件夹：音视频管理类，包含初始化，登录，呼叫，邀请等逻辑的相关操作管理
   - bean 呼叫所需数据元，需要混淆时keep
   - model 主要功能实现
-  - push 推送相关配置
   - service 呼叫相关服务，确保应用收到呼叫时换气相关接听界面
   - utils 其他
 
