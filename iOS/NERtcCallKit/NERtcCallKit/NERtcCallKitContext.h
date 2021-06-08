@@ -10,6 +10,7 @@
 #import <NIMSDK/NIMSDK.h>
 #import "NERtcCallKitDelegateProxy.h"
 #import "NERtcCallKitConsts.h"
+#import "INERtcCallKitCompat.h"
 
 @protocol INERtcCallStatus ;
 
@@ -35,6 +36,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 @property (nonatomic, readonly) NSString *userID;
 @property (nonatomic, readonly) NSString *userName;
+@property (nonatomic, strong) id<INERtcCallKitCompat> compat;
 
 /// 等待token回调
 @property (nonatomic, strong, readonly) NSCondition *tokenLock;

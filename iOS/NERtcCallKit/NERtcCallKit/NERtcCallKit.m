@@ -26,7 +26,7 @@
 
 #import "NERtcCallKit+Private.h"
 
-static NSString * kNERtcCallKitMarketVersion = @"1.2.0";
+static NSString * kNERtcCallKitMarketVersion = @"1.2.1";
 
 @interface NERtcCallKit() <NIMSignalManagerDelegate,NIMLoginManagerDelegate,NERtcEngineDelegateEx,INERtcCallStatus,NERtcEngineMediaStatsObserver>
 
@@ -219,6 +219,7 @@ static NSString * kNERtcCallKitMarketVersion = @"1.2.0";
 
 - (void)setCallStatus:(NERtcCallStatus)callStatus {
     _callStatus = callStatus;
+    NCKLogInfo(@"Set call status %@", @(callStatus));
     switch (_callStatus) {
         case NERtcCallStatusIdle:
             self.currentStatus = self.idleStatus;
@@ -288,27 +289,30 @@ static NSString * kNERtcCallKitMarketVersion = @"1.2.0";
             break;
         }
         case NIMSignalingEventTypeAccept: {
+            if (self.callStatus != NERtcCallStatusCalling) {
+                NCKLogError(@"Receive accept event but status is %@", @(self.callStatus));
+                return;
+            }
             NIMSignalingAcceptNotifyInfo *accept = (NIMSignalingAcceptNotifyInfo *)notifyResponse;
             self.context.inviteList[accept.requestId ?: @""] = nil;
             if (!self.context.isGroupCall) {
                 uint64_t myUid = self.context.localUid;
                 NSDictionary *acceptInfo = [NERtcCallKitUtils JSONObjectWithString:accept.customInfo];
-                id<INERtcCallKitCompat> compat = [NERtcCallKitCompatFactory.defaultFactory compatWithVersion:acceptInfo[@"version"]];
+                self.context.compat = [NERtcCallKitCompatFactory.defaultFactory compatWithVersion:acceptInfo[@"version"]];
                 NSString *channelId = self.context.channelInfo.channelId;
-                NSString *channelName = [compat realChannelName:self.context.channelInfo];
+                NSString *channelName = [self.context.compat realChannelName:self.context.channelInfo];
+                self.context.channelInfo.channelName = channelName;
                 [self waitTokenTimeout:30 completion:^(NSString * _Nonnull token) {
                     [self joinRtcChannel:channelName myUid:myUid token:self.context.token completion:^(NSError * _Nullable error) {
-                        if (error) {
+                        if (error && error.code != kNERtcCallKitChannelIsClosedError) {
                             NCKLogError(@"JOIN RTC Channel Error %@", error);
                             [self closeSignalChannel:^{
-                                if (error.code != kNERtcCallKitChannelIsClosedError) {
-                                    [self.delegateProxy onError:error];
-                                    [self.delegateProxy onCallEnd];
-                                }
+                                [self.delegateProxy onError:error];
+                                [self.delegateProxy onCallEnd];
                             }];
                             return;
                         }
-                        [compat callerSendCid1To:accept.fromAccountId channel:channelId];
+                        [self.context.compat callerSendCid1To:accept.fromAccountId channel:channelId];
                     }];
                 }];
             }
@@ -458,7 +462,7 @@ static NSString * kNERtcCallKitMarketVersion = @"1.2.0";
     }
     [self.context fetchMemberWithUid:userID completion:^(NIMSignalingMemberInfo * _Nonnull member) {
         [self.context removeMember:member];
-        if (reason == kNERtcSessionLeaveTimeout) {
+        if (reason == kNERtcSessionLeaveTimeout || reason == kNERtcSessionLeaveForKick) {
             [self.delegateProxy onUserDisconnect:member.accountId];
         } else if (reason == kNERtcSessionLeaveNormal) {
             [self.delegateProxy onUserLeave:member.accountId];
@@ -531,6 +535,7 @@ static NSString * kNERtcCallKitMarketVersion = @"1.2.0";
     }
     BOOL isFromGroup = [customInfo[@"callType"] isEqual:@1];
     self.context.inviteInfo = info;
+    self.context.compat = [NERtcCallKitCompatFactory.defaultFactory compatWithVersion:customInfo[@"version"]];
     
     NSString *invitee = info.fromAccountId;
     NERtcCallType type = info.channelInfo.channelType == NIMSignalingChannelTypeAudio ? NERtcCallTypeAudio : NERtcCallTypeVideo;

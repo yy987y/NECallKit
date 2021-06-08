@@ -44,6 +44,7 @@
 
 - (void)hangup:(void (^)(NSError * _Nullable))completion {
     // 信令 离开频道
+    [NERtcCallKit.sharedInstance cancelTimeout];
     dispatch_group_t group = dispatch_group_create();
     NSArray<NIMSignalingInviteRequest *> *inviteInfos = self.context.inviteList.allValues;
     for (NIMSignalingInviteRequest *invite in inviteInfos) {
