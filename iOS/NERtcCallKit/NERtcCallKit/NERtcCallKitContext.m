@@ -62,7 +62,9 @@
     self.groupID = nil;
     self.remoteUserID = nil;
     self.token = @"";
+    [self.tokenLock signal];
     [self.memberSemas removeAllObjects];
+    self.compat = nil;
 }
 
 - (uint64_t)localUid {

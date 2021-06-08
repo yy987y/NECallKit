@@ -106,10 +106,11 @@
             // 对方老版本，则等cid=1。对方新版本，则等待token并加入
             [NERtcCallKit.sharedInstance fetchToken:nil];
             NSDictionary *callerInfo = [NERtcCallKitUtils JSONObjectWithString:self.context.inviteInfo.customInfo];
-            NSString *channelName = callerInfo[@"channelName"] ?: self.context.channelInfo.channelName;
-            self.context.channelInfo.channelName = channelName;
             id<INERtcCallKitCompat> compat = [NERtcCallKitCompatFactory.defaultFactory compatWithVersion:callerInfo[@"version"]];
-            [compat calleeJoinRtcOnAccept:channelName
+            if (callerInfo[@"channelName"]) {
+                self.context.channelInfo.channelName = callerInfo[@"channelName"];
+            }
+            [compat calleeJoinRtcOnAccept:[compat realChannelName:self.context.channelInfo]
                                     myUid:self.context.localUid
                                completion:completion];
         }

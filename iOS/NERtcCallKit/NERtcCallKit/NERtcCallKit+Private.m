@@ -276,7 +276,8 @@
                  token:(NSString *)token
             completion:(void(^)(NSError * _Nullable error))completion {
     
-    if (!self.context.channelInfo) {
+    if (!self.context.channelInfo || (!self.context.isGroupCall && ![channelID isEqualToString:[self.context.compat realChannelName:self.context.channelInfo]])) {
+        NCKLogError(@"Try to join channel %@ which is already closed", channelID);
         if (completion) {
             NSError *error = [NSError errorWithDomain:kNERtcCallKitErrorDomain code:kNERtcCallKitChannelIsClosedError userInfo:@{NSLocalizedDescriptionKey: kNERtcCallKitChannelIsClosedErrorDescription}];
             completion(error);
