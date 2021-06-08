@@ -35,11 +35,11 @@ dependencies {
     implementation 'com.blankj:utilcodex:1.29.0'
     implementation 'com.netease.yunxin.kit:alog:1.0.0'
 
-    nimVersion = '8.3.1'
+    nimVersion = '8.4.6'
 
     implementation "com.netease.nimlib:basesdk:$nimVersion"
     implementation "com.netease.nimlib:avsignalling:$nimVersion"
     implementation "com.netease.nimlib:push:$nimVersion"
-    api 'com.netease.yunxin:nertc:4.0.3'
+    api 'com.netease.yunxin:nertc:4.0.7'
 
 }

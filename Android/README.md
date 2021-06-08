@@ -34,7 +34,7 @@
 
 * Maven集成
 
-> implementation 'com.netease.yunxin.kit:call:1.2.0'
+> implementation 'com.netease.yunxin.kit:call:1.2.1'
 ```groovy
 allprojects {
     repositories {
@@ -377,8 +377,10 @@ nertcVideoCall.accept(invitedParam, selfUserId, new JoinChannelCallBack() {
 /**
  * 当您处于通话中，可以调用该函数结束通话（离开房间并关闭房间）
  * 通话发起者拥有此权限，并可以授权给接受者是否拥有此权限
+ * channelId 需挂断的通话 id，如果为 null 则默认关闭当前通话；如果不为 null 则关闭当前对应的通话，若通话不存在则不执行挂断动作，并抛出
+ * delegate 的 onError 回调；此处 channelId 的获取可参考 demo
  */
-nertcVideoCall.hangup(new RequestCallback<Void>() {
+nertcVideoCall.hangup(channelId,new RequestCallback<Void>() {
     @Override
     public void onSuccess(Void aVoid) { }
 
