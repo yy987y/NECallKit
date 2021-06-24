@@ -681,7 +681,7 @@ NERTCVideoCall.sharedInstance().leave(callback);
 
 ## 2. API 文档
 
-详见[Android API 文档](待 吴丹 上线 api 文档后链接对应位置；)
+详见[Android API 文档](https://dev.yunxin.163.com/docs/interface/NERTCCallkit/Latest/Android/html/)
 
 
 
