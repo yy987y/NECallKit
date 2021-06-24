@@ -391,7 +391,7 @@ NERtcCallKit.sharedInstance.timeOutSeconds = 30;// 单位为秒
 
 ## 2. API 文档
 
-详见[iOS API 文档](待 吴丹 上线 api 文档后链接对应位置；)
+暂未实现
 
 
 
