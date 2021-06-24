@@ -33,7 +33,7 @@ android{
 
 ### 1.2 初始化
 
-**组件初始化不包含 IM sdk 的初始化，且组件初始化必须放在 IM sdk 初始化之后，否则会出现崩溃。**可以放在 Application/MainActivity 内完成组件初始化调用。
+**组件初始化不包含 IM sdk 的初始化，且组件初始化必须放在 IM sdk 初始化之后，否则会出现崩溃。** 可以放在 Application/MainActivity 内完成组件初始化调用。
 
 组件实现为单实例，通过接口 `NERTCVideoCall.sharedInstance()` 获取此实例，调用实例方法 `setupAppKey` 完成初始化。
 
