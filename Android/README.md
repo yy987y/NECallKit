@@ -150,7 +150,7 @@ public interface UIService {
 
 ### 1.3 登录/登出
 
-**用户若已经在 app 内实现了 IM 登录/登出逻辑，则不必调用相应的登录/登出接口，直接跳过此章节。**
+**用户若已经在 app 内实现了 IM 登录/登出逻辑，则不必调用相应的登录/登出接口避免重复登录出现登录失败，直接跳过此章节。**
 
 用户在 IM sdk 及组件初始化完成后，可调用 `NERTCVideoCall.login(String imAccount, String imToken, RequestCallback<LoginInfo> callback)` 接口实现 IM 登录。
 
