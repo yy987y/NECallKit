@@ -22,6 +22,10 @@
       * [1\.7\.3 用户离开](#173-用户离开)
       * [1\.7\.4 其他行为说明](#174-其他行为说明)
       * [1\.7\.5 存在的问题](#175-存在的问题)
+    * [1\.8 话单接收及解析](#18-话单接收及解析)
+      * [1\.8\.1话单类型](#181话单类型)
+      * [1\.8\.2 话单消息接收](#182-话单消息接收)
+      * [1\.8\.3 话单消息解析渲染](#183-话单消息解析渲染)
   * [2\. API 文档](#2-api-文档)
   * [3\. IM sdk/ NERtc sdk 依赖说明](#3-im-sdk-nertc-sdk-依赖说明)
     * [3\.1 IM sdk](#31-im-sdk)
@@ -448,7 +452,7 @@ NERTCVideoCall.sharedInstance().cancel(callback);
 
 **设置回调监听；**
 
-被叫通过回调中的 `onInvited` 方法通知用户收到新邀请通知。
+被叫通过 `onInvited` 方法通知用户收到新邀请通知。
 
 被叫页面设置通过实现 `UIService` 方法完成，被叫页面 Activity 启动后可通过启动 `intent` 解析相应的呼叫参数：
 
@@ -715,6 +719,118 @@ NERTCVideoCall.sharedInstance().leave(callback);
 
 1. 当前版本的群组呼叫不存在中间服务器，所以除了主叫方外，其他的参会者无法获知另外的参会者是否拒绝本次群组通话。
 2. 中途邀请目前仅支持主叫方发起。
+
+
+
+### 1.8 话单接收及解析
+
+**！！！！呼叫组件不包含话单接收及解析功能，用户可参考代码自行实现。详细可看 [消息收发](http://dev.yunxin.163.com/docs/product/IM即时通讯/SDK开发集成/Android开发集成/消息收发?#消息接收)！！！！**
+
+#### 1.8.1话单类型
+
+| 代码                                    | 话单类型 | 说明                                                         |
+| --------------------------------------- | -------- | ------------------------------------------------------------ |
+| `NrtcCallStatus.NrtcCallStatusComplete` | 1        | 正常通话话单，通话双方都进入音视频通话后进行挂断。由组件服务器发送。 |
+| `NrtcCallStatus.NrtcCallStatusCanceled` | 2        | 主叫取消话单，主叫呼叫后主动取消的话单。由客户端主叫方发送。 |
+| `NrtcCallStatus.NrtcCallStatusRejected` | 3        | 被叫拒接话单，被叫拒接接听后的话单。客户端主叫方收到被叫拒接消息后进行发送。 |
+| `NrtcCallStatus.NrtcCallStatusTimeout`  | 4        | 超时话单，被叫收到通话邀请后不操作等待超时产生的话单。客户端主叫方发送。 |
+| `NrtcCallStatus.NrtcCallStatusBusy`     | 5        | 占线话单（用户忙），当主叫呼叫被叫时，被叫仍处于通话以及呼叫/被叫中，此时被叫会拒绝主叫的通话邀请。客户端主叫收到消息后会发送占线话单。 |
+
+#### 1.8.2 话单消息接收
+
+话单消息同普通消息一样通过 IM sdk 进行消息接收，**参考代码** 如下：
+
+```java
+/**
+  * 话单消息接收注册，同正常消息接收一样
+  */
+private void registerObserver() {
+	/**
+		* 注册消息接收观察者。 <br>
+		* 通知的消息列表中的消息不一定全是接收的消息，也有可能是自己发出去，比如其他端发的消息漫游过来，
+		*/
+	NIMClient.getService(MsgServiceObserve.class).observeReceiveMessage(new Observer<List<IMMessage>>() {
+		@Override
+		public void onEvent(List<IMMessage> imMessages) {
+			for (IMMessage item : imMessages) {
+				parseForNetCall(item);
+			}
+		}
+	}, true);
+	/**
+		* 用于发送消息后本地列表解析对应消息
+		*/
+	NIMClient.getService(MsgServiceObserve.class).observeMsgStatus(new Observer<IMMessage>() {
+		@Override
+		public void onEvent(IMMessage imMessage) {
+			parseForNetCall(imMessage);
+		}
+	}, true);
+}
+
+```
+
+#### 1.8.3 话单消息解析渲染
+
+接收到消息后进行消息解析，**参考代码**如下：
+
+```java
+/**
+	* 解析话单消息数据，一般用于 recyclerView adapter 中渲染
+	*
+	* @param message 当前IM消息
+	*/
+private void parseForNetCall(IMMessage message) {
+	if (message == null) {
+		return;
+	}
+	// 此处只处理话单消息
+	if (message.getAttachment() instanceof NetCallAttachment) {
+		NetCallAttachment attachment = (NetCallAttachment) message.getAttachment();
+			/**
+				* 消息来源方向详见 {@link MsgDirectionEnum}
+				*/
+		MsgDirectionEnum direction = message.getDirect();
+		// 音频/视频 类型通话
+		int type = attachment.getType();
+		// 话单类型
+		int status = attachment.getStatus();
+		// 时长列表
+		List<NetCallAttachment.Duration> durations = attachment.getDurations();
+
+		// 按照话单类型解析
+		switch (attachment.getStatus()) {
+			case NrtcCallStatus.NrtcCallStatusComplete:
+				// 成功接听
+				if (attachment.getDurations() == null) {
+					break;
+				}
+				// 通话时长渲染
+				for (NetCallAttachment.Duration duration : durations) {
+					// 参与通话用户
+					String accId = duration.getAccid();
+					// 通话时长 单位为 秒
+					int seconds = duration.getDuration();
+				}
+				break;
+			case NrtcCallStatus.NrtcCallStatusCanceled:
+				// 主叫用户取消
+				break;
+			case NrtcCallStatus.NrtcCallStatusRejected:
+				// 被叫用户拒接
+				break;
+			case NrtcCallStatus.NrtcCallStatusTimeout:
+				// 被叫接听超时
+				break;
+			case NrtcCallStatus.NrtcCallStatusBusy:
+				// 被叫用户在通话中，占线
+				break;
+		}
+	}
+}
+```
+
+
 
 
 
