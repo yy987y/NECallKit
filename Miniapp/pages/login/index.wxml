@@ -1,0 +1,16 @@
+<view class="container-box">
+  <view class='title' style='padding-top:{{(headerHeight + statusBarHeight)/2 - 12}}px'>
+    <view>登录</view>
+  </view>
+  <view class="input-wrapper">
+    <input type="text" value="{{account}}" data-type="account" bindinput="changeHandler" placeholder="呼叫人id" />
+  </view>
+  <view class="input-wrapper">
+    <input type="text" value="{{passport}}" data-type="passport" bindinput="changeHandler" password
+      placeholder="呼叫人密码" />
+  </view>
+  <view class="tip">*该密码为测试密码，使用方需自己实现</view>
+</view>
+<view class='bottom-btn'>
+  <button class="btn" bindtap="toLogin" hover-class="none">登录</button>
+</view>
