@@ -746,9 +746,9 @@ NERTCVideoCall.sharedInstance().leave(callback);
   */
 private void registerObserver() {
 	/**
-		* 注册消息接收观察者。 <br>
-		* 通知的消息列表中的消息不一定全是接收的消息，也有可能是自己发出去，比如其他端发的消息漫游过来，
-		*/
+	  * 注册消息接收观察者。 <br>
+	  * 通知的消息列表中的消息不一定全是接收的消息，也有可能是自己发出去，比如其他端发的消息漫游过来，
+	  */
 	NIMClient.getService(MsgServiceObserve.class).observeReceiveMessage(new Observer<List<IMMessage>>() {
 		@Override
 		public void onEvent(List<IMMessage> imMessages) {
@@ -758,8 +758,8 @@ private void registerObserver() {
 		}
 	}, true);
 	/**
-		* 用于发送消息后本地列表解析对应消息
-		*/
+	  * 用于发送消息后本地列表解析对应消息
+	  */
 	NIMClient.getService(MsgServiceObserve.class).observeMsgStatus(new Observer<IMMessage>() {
 		@Override
 		public void onEvent(IMMessage imMessage) {
@@ -776,10 +776,10 @@ private void registerObserver() {
 
 ```java
 /**
-	* 解析话单消息数据，一般用于 recyclerView adapter 中渲染
-	*
-	* @param message 当前IM消息
-	*/
+ * 解析话单消息数据，一般用于 recyclerView adapter 中渲染
+ *
+ * @param message 当前IM消息
+ */
 private void parseForNetCall(IMMessage message) {
 	if (message == null) {
 		return;
@@ -787,9 +787,9 @@ private void parseForNetCall(IMMessage message) {
 	// 此处只处理话单消息
 	if (message.getAttachment() instanceof NetCallAttachment) {
 		NetCallAttachment attachment = (NetCallAttachment) message.getAttachment();
-			/**
-				* 消息来源方向详见 {@link MsgDirectionEnum}
-				*/
+		/**
+		  * 消息来源方向详见 {@link MsgDirectionEnum}
+		  */
 		MsgDirectionEnum direction = message.getDirect();
 		// 音频/视频 类型通话
 		int type = attachment.getType();
