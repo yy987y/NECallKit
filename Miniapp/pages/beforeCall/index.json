@@ -1,7 +1,0 @@
-{
-  "navigationStyle": "custom",
-  "disableScroll": true,
-  "usingComponents": {
-    "nertc-call": "/components/nertc-call/nertc-call"
-  }
-}
