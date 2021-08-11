@@ -13,8 +13,8 @@
 **es module:**
 
 ```js
-import { RTCCalling } from 'yourPath';
-const rtc = new RTCCalling({
+import NERTCCalling from 'yourPath';
+const rtc = new NERTCCalling({
   debug: true, // 是否需要开启日志，默认开启
 });
 ```
@@ -22,8 +22,8 @@ const rtc = new RTCCalling({
 **commonjs:**
 
 ```js
-const { RTCCalling } = require('yourPath');
-const rtc = new RTCCalling({
+const NERTCCalling = require('yourPath');
+const rtc = new NERTCCalling({
   debug: true, // 是否需要开启日志，默认开启
 });
 ```
@@ -35,8 +35,8 @@ const rtc = new RTCCalling({
 <script src="/yourPath/assets/sdk/NIM_Web_WebRTC2_v4.1.0.js"></script>
 <script src="/yourPath/lib/index.umd.js"></script>
 <script>
-  var RTCCalling = window.NERTCCalling.RTCCalling;
-  var rtc = new RTCCalling({
+  var NERTCCalling = window.NERTCCalling.default;
+  var rtc = new NERTCCalling({
     debug: true, // 是否需要开启日志，默认开启
   });
 </script>
