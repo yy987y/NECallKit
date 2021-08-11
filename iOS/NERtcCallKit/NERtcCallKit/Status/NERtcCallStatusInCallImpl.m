@@ -24,6 +24,7 @@
 
 - (void)call:(NSString *)userID
         type:(NERtcCallType)type
+  attachment:(nullable NSString *)attachment
   completion:(void (^)(NSError * _Nullable))completion {
     if (!completion) return;
     
@@ -34,6 +35,7 @@
 - (void)groupCall:(NSArray<NSString *> *)userIDs
           groupID:(NSString *)groupID
              type:(NERtcCallType)type
+       attachment:(nullable NSString *)attachment
        completion:(void (^)(NSError * _Nullable))completion {
     
     if (!completion) return;
@@ -42,8 +44,31 @@
     completion(error);
 }
 
+- (void)groupInvite:(NSArray<NSString *> *)userIDs
+            groupID:(NSString *)groupID
+         attachment:attachment
+         completion:(void (^)(NSError * _Nullable))completion {
+    
+    if (!self.context.isGroupCall) {
+        NSError *error = [NSError errorWithDomain:kNERtcCallKitErrorDomain code:20032 userInfo:@{NSLocalizedDescriptionKey: @"只能在多人呼叫模式下邀请"}];
+        return completion(error);
+    }
+    
+    // 已经在邀请中的或者已经在房间内的过滤
+    NSArray *invitedAccids = [self.context.inviteList.allValues valueForKeyPath:@"accountId"];
+    NSSet *invitedAccidSet = invitedAccids ? [NSSet setWithArray:invitedAccids] : nil;
+    userIDs = [userIDs filteredArrayUsingPredicate:[NSPredicate predicateWithBlock:^BOOL(id  _Nullable evaluatedObject, NSDictionary<NSString *,id> * _Nullable bindings) {
+        NSString *accid = evaluatedObject;
+        return [self.context memberOfAccid:accid] == nil && ![invitedAccidSet containsObject:accid];
+    }]];
+    
+    [NERtcCallKit.sharedInstance batchInvite:userIDs groupID:groupID attachment:attachment completion:completion];
+    [NERtcCallKit.sharedInstance waitTimeout];
+}
+
 - (void)hangup:(void (^)(NSError * _Nullable))completion {
     // 信令 离开频道
+    [NERtcCallKit.sharedInstance cancelTimeout];
     dispatch_group_t group = dispatch_group_create();
     NSArray<NIMSignalingInviteRequest *> *inviteInfos = self.context.inviteList.allValues;
     for (NIMSignalingInviteRequest *invite in inviteInfos) {
@@ -60,9 +85,7 @@
             dispatch_group_leave(group);
         }];
     }
-    // RTC 离开频道
-//    [NERtcEngine.sharedEngine leaveChannel];
-    
+        
     dispatch_group_notify(group, NSOperationQueue.currentQueue.underlyingQueue ?: dispatch_get_main_queue(), ^{
         [NERtcCallKit.sharedInstance closeSignalChannel:^{
             if (completion) {
@@ -77,7 +100,6 @@
     NIMSignalingLeaveChannelRequest *request = [[NIMSignalingLeaveChannelRequest alloc] init];
     request.channelId = self.context.channelInfo.channelId;
     [NIMSDK.sharedSDK.signalManager signalingLeaveChannel:request completion:^(NSError * _Nullable error) {
-        [self.context cleanUp];
         NERtcCallKit.sharedInstance.callStatus = NERtcCallStatusIdle;
         if (completion) {
             completion(nil);
@@ -147,29 +169,14 @@
     }];
 }
 
-- (void)groupInvite:(NSArray<NSString *> *)userIDs
-            groupID:(NSString *)groupID
-         completion:(void (^)(NSError * _Nullable))completion {
-    
-    if (!self.context.isGroupCall) {
-        NSError *error = [NSError errorWithDomain:kNERtcCallKitErrorDomain code:20032 userInfo:@{NSLocalizedDescriptionKey: @"只能在多人呼叫模式下邀请"}];
-        return completion(error);
-    }
-    
-    // 已经在邀请中的或者已经在房间内的过滤
-    NSArray *invitedAccids = [self.context.inviteList.allValues valueForKeyPath:@"accountId"];
-    NSSet *invitedAccidSet = invitedAccids ? [NSSet setWithArray:invitedAccids] : nil;
-    userIDs = [userIDs filteredArrayUsingPredicate:[NSPredicate predicateWithBlock:^BOOL(id  _Nullable evaluatedObject, NSDictionary<NSString *,id> * _Nullable bindings) {
-        NSString *accid = evaluatedObject;
-        return [self.context memberOfAccid:accid] == nil && ![invitedAccidSet containsObject:accid];
-    }]];
-    
-    [NERtcCallKit.sharedInstance batchInvite:userIDs groupID:groupID completion:completion];
-    [NERtcCallKit.sharedInstance waitTimeout];
-}
-
 - (void)onTimeout {
-    [NERtcCallKit.sharedInstance cancelInvites:nil];
+    if (self.context.isGroupCall) {
+        [NERtcCallKit.sharedInstance cancelInvites:nil];
+    } else {
+        [self hangup:^(NSError * _Nullable error) {
+            [NERtcCallKit.sharedInstance.delegateProxy onCallEnd];
+        }];
+    }
 }
 
 @end
