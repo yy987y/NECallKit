@@ -2,7 +2,7 @@
 
 ## 下载
 
-1. 通过[链接](https://yx-web-nosdn.netease.im/package/1628661115/%E5%BD%92%E6%A1%A3.zip?download=%E5%BD%92%E6%A1%A3.zip)下载组件。
+1. 通过[链接](https://yx-web-nosdn.netease.im/package/1628829743/nertc-calling.zip?download=nertc-calling.zip)下载组件。
 2. 将下载后的组件解压，重命名后放入项目中
 3. 添加到`eslintignore`或者`prettierignore`等忽略中，如没有可忽略这一步
 
@@ -376,8 +376,15 @@ rtc.addDelegate('onUserLeave', (userId: string) => {
 
 /**
  * onCallingTimeOut 呼叫超时事件
+ * @param reason 原因 
+ * callTimeOut 点对点呼叫超时
+ * groupCallTimeOut 群呼叫超时
+ * groupInviteTimeOut 群邀请超时
+ * beCallTimeOut 被叫超时
  */
-rtc.addDelegate('onCallingTimeOut', () => {});
+rtc.addDelegate('onCallingTimeOut', (reason) => {
+  console.log(reason)
+});
 
 /**
  * onCameraAvailable 远端用户摄像头开关事件
