@@ -1,16 +1,28 @@
 //app.js
 App({
-  onLaunch: function () {
-    let systemInfo = wx.getSystemInfoSync()
-    this.globalData.videoContainerSize = {
-      width: systemInfo.windowWidth,
-      height: systemInfo.windowHeight - 40
+  onLaunch: function() {
+    const { model, system, statusBarHeight, windowWidth, windowHeight } = wx.getSystemInfoSync()
+    let headHeight
+    if (/iphone\s{0,}x/i.test(model)) {
+      headHeight = 88
+    } else if (system.indexOf('Android') !== -1) {
+      headHeight = 68
+    } else {
+      headHeight = 64
     }
+    this.globalData.videoContainerSize = {
+      width: windowWidth,
+      height: windowHeight - 40
+    }
+    this.globalData.headerHeight = headHeight
+    this.globalData.statusBarHeight = statusBarHeight
   },
   globalData: {
+    headerHeight: 0,
+    statusBarHeight: 0,
     channelInfo: {},
     imInfo: {}, // 会话配置信息
-  }
+  },
 })
 /**
  * 房间信息
