@@ -25,3 +25,14 @@ export function formatTime(secondTime) {
 }
 
 export const uuid = () => Math.ceil(Math.random() * 1e5) + ''
+
+export const prevent = (fn, delay) => {
+	let last = 0
+	return function(...args) {
+	  const cur = Date.now()
+	  if (cur - last > delay) {
+		fn.apply(this, args);
+		last = cur;
+	  }
+	}
+}
