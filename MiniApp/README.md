@@ -1,4 +1,4 @@
-# NeCallKit-MiniApp-demo快速跑通
+# NeCallKit-MiniApp-demo快速开始
 
 网易智慧企业 在 GitHub 上提供一个开源的呼叫组件示例项目 [VideoCall](https://github.com/netease-kit/NECallKit/tree/master/MiniApp)。本文介绍如何快速跑通该示例项目，体验呼叫音视频通话功能。
 
