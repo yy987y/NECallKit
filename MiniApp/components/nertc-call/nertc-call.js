@@ -1025,6 +1025,7 @@ Component({
                 pusher
               }, () => {
                 logger.log(TAG_NAME, 'enterRoom success', this.data.pusher)
+                this._emitter.emit('onJoinChannel', this.client._info);
                 this._pusherStart()
                 this.status.isPush = true
                 resolve()
