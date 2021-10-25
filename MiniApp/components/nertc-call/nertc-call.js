@@ -325,7 +325,6 @@ Component({
       } catch (err) {
         params?.fail?.(err);
       }
-
     },
     /**
   * 设置呼叫超时时间，在呼叫前调用
@@ -513,7 +512,7 @@ Component({
               logger.warn("this.mutiClientOp")
               return
             }
-            if (this.channelInfo.channelId !== event.channelId) {
+            if ((this.channelInfo && this.channelInfo.channelId) !== event.channelId) {
               logger.warn("channleId不同")
               return
             }
@@ -1427,7 +1426,7 @@ Component({
 
         }
       } catch (error) {
-        logger.error(TAG_NAME, '_onStreamAdded fail: ', err)
+        logger.error(TAG_NAME, '_onStreamAdded fail: ', error)
       }
     },
     _onStreamRemoved(data) {
