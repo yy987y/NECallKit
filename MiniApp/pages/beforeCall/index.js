@@ -37,7 +37,6 @@ Page({
   onLoad: function () {
     this.nertcComponent = this.selectComponent('#nertc-component')
     const nickName = this.options.account || `用户${Math.ceil(Math.random() * 1000000)}`
-
     const queryParams = {
       ...this.data.rtcConfig,
       account: this.options.account,
@@ -191,6 +190,10 @@ Page({
     this.nertcComponent.on("onDisconnect", () => {
       console.log("====onDisconnect======")
       this.resetUI()
+    })
+    // 获取rtc信息
+    this.nertcComponent.on("onJoinChannel", (data) => {
+      console.log("====onJoinChannel======", data)
     })
     this.nertcComponent.on(nertcComponentEvent.OTHER_CLIENT_REJECT, () => {
       this.resetUI()
